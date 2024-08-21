@@ -1,0 +1,299 @@
+@page "/create_deposit"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject DepositController DepositController
+@inject PromotionController PromotionController
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-<sha_integrity>" crossorigin="anonymous"/>
+
+<header class="text-center mt-2">
+    <h1 class="">Agregar Depósito</h1>
+</header>
+
+<section class="mt-5 d-flex justify-content-center">
+    <form>
+        <div class="mb-3 row">
+            <label for="name" class="col-sm-4 col-form-label">Nombre</label>
+            <div class="col-sm-8">
+                <input type="text" @bind="_selectedName" id="name" name="name" required class="form-control" />
+            </div>
+        </div>
+        <div class="mb-3 row">
+            <label for="area" class="col-sm-4 col-form-label">Área</label>
+            <div class="col-sm-8">
+                <select @bind="_selectedArea" id="area" name="area" required class="form-select">
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                    <option value="E">E</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-3 row">
+            <label for="size" class="col-sm-4 col-form-label">Tamaño</label>
+            <div class="col-sm-8">
+                <select @bind="_selectedSize" id="size" name="size" required class="form-select">
+                    <option value="Grande">Grande</option>
+                    <option value="Mediano">Mediano</option>
+                    <option value="Pequeño">Pequeño</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-3 row">
+            <label class="col-sm-4">Climatización</label>
+            <div class="col-sm-8">
+                <div class="form-check form-check-inline">
+                    <input type="radio" id="conditioning_yes" name="conditioning" value="yes" class="form-check-input" checked="@((_conditioningText == "yes"))" @onchange='() => _conditioningText = "yes"'>
+                    <label for="conditioning_yes" class="form-check-label">Si</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input name="conditioning" id="conditioning_no" type="radio" required class="form-check-input" value="no" checked="@((_conditioningText == "no"))" @onchange='() => _conditioningText = "no"'>
+                    <label for="conditioning_no" class="form-check-label">No</label>
+                </div>
+            </div>
+        </div>
+        <div class="mb-3 row">
+            <label for="promotions" class="col-sm-4 col-form-label">Promociones</label>
+            <div class="col-sm-8">
+                <select @bind="_selectedPromotionIds" id="promotions" name="promotions" class="form-select" multiple aria-describedby="promotionsHelpBlock">
+                    @foreach (var promotion in _promotions)
+                    {
+                        <option value="@promotion.Id">@($"Id: {promotion.Id} | Tag: {promotion.Tag}")</option>
+                    }
+                </select>
+                <span id="promotionsHelpBlock" class="form-text text-muted">Para agregar más de una promoción debe mantener presionada la tecla Ctrl.</span>
+            </div>
+        </div>
+        <div class="mb-3 row">
+            <div class="d-flex justify-content-center">
+                <button name="submit" type="button" class="btn text-white" style="background-color: #4E9F3D" @onclick="AddDeposit">Agregar Depósito</button>
+            </div>
+        </div>
+    </form>
+</section>
+
+@if (!string.IsNullOrEmpty(_successMessage))
+{
+    <div class="alert alert-success" role="alert">
+        @_successMessage
+    </div>
+}
+else if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @_errorMessage
+    </div>
+}
+<div>
+    <h2 class="text-center mt-5">Depósitos existentes</h2>
+</div>
+@if (DepositListIsEmpty(_deposits))
+{
+    <p class="text-center">No hay depósitos registrados</p>
+}
+else
+{
+    <div class="d-flex align-items-center flex-column ">
+        @foreach (var deposit in _deposits)
+        {
+            <div class="card mt-3 mb-3 w-50 rounded-3">
+                <div class="card-body">
+                    <h5 class="card-title">Deposito: @deposit.Name</h5>
+                    <p class="card-text">Área: @deposit.Area</p>
+                    <p class="card-text">Tamaño: @deposit.Size</p>
+                    <p class="card-text">Climatización: @(deposit.Conditioning ? "Si" : "No")</p>
+                    @foreach(var promotion in GetDepositPromotions(deposit.Id))
+                    {
+                        <p class="card-text">Promoción: ID: @promotion.Id | Tag: @promotion.Tag</p>
+                    }
+                    <button class="btn btn-danger" @onclick="() => DeleteDeposit(deposit.Id)">Borrar</button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+
+@code {
+    private string _selectedName = "Nuevo deposito";
+    private char _selectedArea = 'A';
+    private string _selectedSize = "Grande";
+    private string _conditioningText = "yes";
+    private bool _selectedConditioning;
+    private string? _successMessage;
+    private string? _errorMessage;
+    private string[] _selectedPromotionIds = Array.Empty<string>();
+    private List<PromotionInDepositManagementDto> _promotions = new List<PromotionInDepositManagementDto>();
+    private List<DepositManagementDto> _deposits = new List<DepositManagementDto>();
+
+
+    List<PromotionManagementDto> GetDepositPromotions(int depositId)
+    {
+        var ret = new List<PromotionManagementDto>();
+        try
+        {
+            ret = DepositController.GetPromotionsInDepositInPromotionManagementDto(depositId);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        return ret;
+    }
+
+    private void LoadDeposits()
+    {
+        try
+        {
+            _deposits = DepositController.GetDepositManagementDtos();
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        
+    }
+
+    private void DeleteDeposit(int id)
+    {
+        try
+        {
+            DepositController.RemoveDeposit(id);
+            const string successRemovingDepositMessage = "Depósito eliminado correctamente";
+            SetSuccessMessage(successRemovingDepositMessage);
+            SetErrorMessage(string.Empty);
+            LoadDeposits();
+        }
+        catch (ArgumentException e)
+        {
+            SetErrorMessage(e.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    private void LoadPromotions()
+    {
+        try
+        {
+            _promotions = PromotionController.GetPromotionInDepositManagementDtos();
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    private void AddDeposit()
+    {
+        try
+        {
+            _selectedConditioning = _conditioningText == "yes";
+            if (PromotionListIsEmpty(_promotions))
+            {
+                var emptyPromotionList = new List<PromotionInDepositManagementDto?>();
+                DepositController.AddDeposit(_selectedName, _selectedArea, _selectedSize, _selectedConditioning, emptyPromotionList);
+            }
+            else
+            {
+                var selectedPromotions = ConvertSelectedPromotionIdsToPromotions(_selectedPromotionIds.ToList());
+                DepositController.AddDeposit(_selectedName, _selectedArea, _selectedSize, _selectedConditioning, selectedPromotions);
+            }
+
+            const string sucessAddDepositMessage = "Depósito agregado correctamente";
+            SetSuccessMessage(sucessAddDepositMessage);
+            SetErrorMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetSuccessMessage(string.Empty);
+            SetErrorMessage(ex.Message);
+        }
+        catch (NullReferenceException)
+        {
+            SetSuccessMessage(string.Empty);
+            const string nullReferenceMessage = "Las promociones seleccionadas no existen";
+            SetErrorMessage(nullReferenceMessage);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        finally
+        {
+            LoadDeposits();
+        }
+    }
+
+    private List<PromotionInDepositManagementDto?> ConvertSelectedPromotionIdsToPromotions(List<string> selectedIds)
+    {
+        var selectedPromotions = new List<PromotionInDepositManagementDto?>();
+
+        foreach (var id in selectedIds)
+        {
+            if (_promotions != null && int.TryParse(id, out int promotionId))
+            {
+                var promotion = _promotions.FirstOrDefault(p => p.Id == promotionId);
+                if (promotion != null)
+                {
+                    selectedPromotions.Add(promotion);
+                }
+            }
+        }
+
+        return selectedPromotions;
+    }
+
+
+    protected override void OnInitialized()
+    {
+        LoadPromotions();
+        LoadDeposits();
+    }
+
+    void SetErrorMessage(string message)
+    {
+        _errorMessage = message;
+    }
+
+    void SetSuccessMessage(string message)
+    {
+        _successMessage = message;
+    }
+
+    bool PromotionListIsEmpty(List<PromotionInDepositManagementDto>? promotions)
+    {
+        return promotions == null || promotions.Count == 0;
+    }
+
+    bool DepositListIsEmpty(List<DepositManagementDto> deposits)
+    {
+        return deposits.Count == 0;
+    }
+
+}

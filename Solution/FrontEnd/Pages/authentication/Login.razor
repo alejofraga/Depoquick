@@ -1,0 +1,227 @@
+@page "/login"
+@using System.Security
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject ClientController ClientController
+
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<header class="text-center mt-2">
+    <h1>Ingreso de Usuario</h1>
+</header>
+
+<section class="mt-5 d-flex justify-content-center align-items-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="mb-0">
+                            @if (!_showRegistrationForm)
+                            {
+                                <span>Inicio de Sesión</span>
+                            }
+                            else
+                            {
+                                <span>Registro de Usuario</span>
+                            }
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        @if (!_showRegistrationForm)
+                        {
+                            <form class="needs-validation" novalidate>
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Correo Electrónico</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fa fa-envelope"></i>
+                                        </span>
+                                        <input type="email" class="form-control" id="email" @bind="_loginEmail" placeholder="Ingresa tu correo electrónico" required>
+                                        <div class="invalid-feedback">Por favor ingresa un correo electrónico válido.</div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Contraseña</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fa fa-lock"></i>
+                                        </span>
+                                        <input type="password" class="form-control" id="password" @bind="_loginPassword" placeholder="Ingresa tu contraseña" required>
+                                        <div class="invalid-feedback">Por favor ingresa tu contraseña.</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" name="submit" type="button" @onclick="HandleLogin">Iniciar Sesión</button>
+                            </form>
+                        }
+                        @if (_showRegistrationForm)
+                        {
+                            <form class="needs-validation" novalidate>
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Nombre</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fa fa-user-circle-o"></i>
+                                        </span>
+                                        <input type="text" class="form-control" id="name" @bind="_name" placeholder="Ingresa tu nombre" required maxlength="100">
+                                        <div class="invalid-feedback">Por favor ingresa tu nombre completo.</div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Correo Electrónico</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fa fa-envelope"></i>
+                                        </span>
+                                        <input type="email" class="form-control" id="email" @bind="_registrationEmail" placeholder="Ingresa tu correo electrónico" required>
+                                        <div class="invalid-feedback">Por favor ingresa un correo electrónico válido.</div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Contraseña</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fa fa-lock"></i>
+                                        </span>
+                                        <input type="password" class="form-control" id="password" @bind="_registrationPassword1" placeholder="Ingresa tu contraseña" required>
+                                        <div class="invalid-feedback">Por favor ingresa una contraseña válida.</div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="confirmPassword" class="form-label">Confirmar Contraseña</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fa fa-lock"></i>
+                                        </span>
+                                        <input type="password" class="form-control" id="confirmPassword" @bind="_registrationPassword2" placeholder="Confirma tu contraseña" required>
+                                        <div class="invalid-feedback">Por favor confirma tu contraseña.</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" name="submit" type="button" @onclick="HandleClientRegistration">Registrarse</button>
+                            </form>
+                        }
+                    </div>
+                    <button class="btn btn-secondary mt-3 ml-3" @onclick="ToggleRegistrationForm">
+                        @if (!_showRegistrationForm)
+                        {
+                            <span> Registrarte </span>
+                        }
+                        else
+                        {
+                            <span>Volver al inicio de sesión</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger mt-3 text-center" role="alert">@_errorMessage</div>
+        }
+        @if (!string.IsNullOrEmpty(_successMessage))
+        {
+            <div class="alert alert-success mt-3 text-center" role="alert">@_successMessage</div>
+        }
+    </div>
+
+
+</section>
+
+@code {
+    bool _showRegistrationForm;
+
+    string? _loginEmail;
+    string? _loginPassword;
+    string? _errorMessage;
+    string? _successMessage;
+    const string NullReferenceMessage = "No se seleccionaron todos los campos";
+
+
+    string? _name;
+    string? _registrationEmail;
+    string? _registrationPassword1;
+    string? _registrationPassword2;
+
+
+    void ToggleRegistrationForm()
+    {
+        _showRegistrationForm = !_showRegistrationForm;
+    }
+
+    void HandleLogin()
+    {
+        try
+        {
+            ClientController.Login(_loginEmail, _loginPassword);
+            const string action = "Inicio de sesión";
+            var now = DateTime.Now;
+            ClientController.AddActionToClient(_loginEmail,action,now);
+            NavigationManager.NavigateTo("/create_reservation");
+        }
+        catch (NullReferenceException)
+        {
+            SetErrorMessage(NullReferenceMessage);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SecurityException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    void HandleClientRegistration()
+    {
+        try
+        {
+            ClientController.RegisterClient(_name, _registrationEmail, _registrationPassword1, _registrationPassword2);
+            const string adminRegistrationSuccessMessage = "Se registro el usuario correctamente.";
+            SetSuccessMessage(adminRegistrationSuccessMessage);
+            SetErrorMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SecurityException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (NullReferenceException)
+        {
+            SetErrorMessage(NullReferenceMessage);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+    
+    
+    void SetErrorMessage(string message)
+    {
+        _errorMessage = message;
+    }
+    
+    void SetSuccessMessage(string message)
+    {
+        _successMessage = message;
+    }
+
+}

@@ -1,0 +1,338 @@
+@page "/create_reservation"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject ClientController ClientController
+@inject DepositController DepositController
+@inject ReservationController ReservationController
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<header class="text-center mt-2">
+    <h1>Reserva de Depositos</h1>
+</header>
+
+<section class="mt-4">
+
+    <div class="mt-3 d-flex justify-content-center">
+        @if (_showConfirmReservationModal)
+        {
+            <div class="modal" tabindex="-1" style="display:block;" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Confirmación de reserva</h5>
+                        </div>
+                        <div class="modal-body">
+                            <p>El precio calculado es de @_depositSelectedCalculatedCost </p>
+                            @if (ReservationHasExtraDiscountByDays())
+                            {
+                                <p>Nota: se agrego un descuento por cantidad de dias de @_discountByDays%</p>
+                            }
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseConfirmReservationModal">Volver</button>
+                            <button type="submit" class="btn btn-primary" @onclick="() => { ReserveDeposit(); CloseConfirmReservationModal(); LoadDeposits(); }">Pagar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (_showReviewModal)
+        {
+            <div class="modal" tabindex="-1" style="display:block;" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Valoraciones del Depósito Nro: @_selectedDepositToCalculateCost.Id </h5>
+                        </div>
+                        <div class="modal-body">
+                            @if (!_selectedDepositToCalculateCost.ContainsAnyReviews)
+                            {
+                                <p> No hay reseñas de este depósito </p>
+                            }
+                            else
+                            {
+                                @foreach (var review in _selectedDepositToCalculateCost.ReviewDtoList)
+                                {
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <hr>
+                                            <p class="card-text">
+                                                <b>Valoración: </b> <span class="font-weight-normal">@review.Valoration estrellas</span>
+                                            </p>
+                                            <hr>
+                                            <p class="card-text">
+                                                <b>Comentario: </b> <span class="font-weight-normal">@review.Comment </span>
+                                            </p>
+                                            <hr>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="() => { HideReviewModal(); }">Volver</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+
+        <form>
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger mt-3 text-center" role="alert">@_errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(_successMessage))
+            {
+                <div class="alert alert-success" role="alert">
+                    @_successMessage
+                </div>
+            }
+            <div class="mb-3 row">
+                <label for="startDate" class="col-sm-4 col-form-label">Fecha de Inicio</label>
+                <div class="col-sm-8">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fa fa-calendar-plus-o"></i>
+                        </span>
+                        <input id="startDate" value="@_startDate.ToString("yyyy-MM-dd")" @oninput="OnStartDateChange"  name="startDate" type="date" required class="form-control">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 row">
+                <label for="endDate" class="col-sm-4 col-form-label">Fecha de Fin</label>
+                <div class="col-sm-8">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fa fa-calendar-minus-o"></i>
+                        </span>
+                        <input id="endDate" value="@_endDate.ToString("yyyy-MM-dd")" @oninput="OnEndDateChange"  name="endDate" type="date" required class="form-control">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 row">
+                <label for="deposits" class="col-sm-4 col-form-label">Depósitos: </label>
+                @if (!_deposits.Any())
+                {
+                    <p> No se encontraron depositos disponibles para esas fechas </p>
+                }
+                else
+                {
+                    @foreach (var deposit in _deposits)
+                    {
+                        <div class="card">
+                            <div class="card-body">
+                                <h4 class="card-title">
+                                    <b>Depósito:</b> <span class="font-weight-normal">@deposit.Name</span>
+                                </h4>
+                                <p class="card-text">
+                                    <b>Área: </b> <span class="font-weight-normal">@deposit.Area</span>
+                                </p>
+                                <p class="card-text">
+                                    <b>Tamaño:</b> <span class="font-weight-bold">@deposit.Size</span>
+                                </p>
+                                <p class="card-text">
+                                    <b>Climatización:</b> <span class="font-weight-bold"> @(deposit.Conditionig ? "Si" : "No") </span>
+                                </p>
+                                <p class="card-text">
+                                    <b>Promociones aplicadas:</b>
+                                </p>
+                                @if (!@deposit.HasPromotions)
+                                {
+                                    <hr>
+                                    <p> No se aplicaron promociones </p>
+                                    <hr>
+                                }
+                                else
+                                {
+                                    <hr>
+                                    @foreach (var promotion in @deposit.PromotionDtoList)
+                                    {
+                                        <p> @promotion.Tag : @promotion.DiscountPercentage % off</p>
+                                        <hr>
+                                    }
+                                }
+                                <button type="button" class="btn btn-primary" @onclick="() => { CalculateReservationCost(deposit); LoadDeposits(); }"> Seleccionar </button>
+                                <button type="button" class="btn btn-primary" @onclick="() => { SetDepositToCalculateCost(deposit); ShowReviewModal(); }"> Ver reseñas </button>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+
+        </form>
+
+    </div>
+</section>
+
+@code {
+    private bool _showConfirmReservationModal;
+    private List<DepositCreateReservationDto> _deposits = new List<DepositCreateReservationDto>();
+    private DepositCreateReservationDto _selectedDepositToCalculateCost = new DepositCreateReservationDto();
+    DateTime _startDate = DateTime.Today;
+    DateTime _endDate = DateTime.Today.AddDays(7);
+    private float _depositSelectedCalculatedCost;
+    string _errorMessage = string.Empty;
+    string _successMessage = string.Empty;
+    private bool _showReviewModal;
+    int _discountByDays;
+
+
+    protected override void OnInitialized()
+    {
+        LoadDeposits();
+    }
+    
+    private void LoadDeposits()
+    {
+        try
+        {
+            _deposits = DepositController.GetAvailableDepositListInCreateReservationDto(_startDate, _endDate);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+    
+    private void OnStartDateChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value.ToString(), out DateTime result))
+        {
+            _startDate = result;
+            LoadDeposits();
+        }
+    }
+
+    private void OnEndDateChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value.ToString(), out DateTime result))
+        {
+            _endDate = result;
+            LoadDeposits();
+        }
+    }
+    private void CalculateReservationCost(DepositCreateReservationDto deposit)
+    {
+        try
+        {
+            SetDepositToCalculateCost(deposit);
+            _depositSelectedCalculatedCost = ReservationController.CalculateReservationCostWithDepositCreateReservationDto(_selectedDepositToCalculateCost, _startDate, _endDate);
+            SetErrorMessage(string.Empty);
+            ShowConfirmReservationModal();
+        }
+        catch (NullReferenceException)
+        {
+            const string nullReferenceMessage = "Por favor, complete todos los campos";
+            SetErrorMessage(nullReferenceMessage);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    private void ReserveDeposit()
+    {
+        try
+        {
+            ReservationController.CreateReservationWithDepositCreateReservationDto(ClientController.GetActiveUserByClientDto(), _selectedDepositToCalculateCost, _startDate, _endDate);
+            const string successCreateReservationMessage = "Reserva realizada con éxito!";
+            SetSuccessMessage(successCreateReservationMessage);
+            SetErrorMessage(string.Empty);
+            LoadDeposits();
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        
+    }
+
+    private void ShowReviewModal()
+    {
+        _showReviewModal = true;
+    }
+
+    private void HideReviewModal()
+    {
+        _showReviewModal = false;
+    }
+
+    private void SetDepositToCalculateCost(DepositCreateReservationDto incommingDeposit)
+    {
+        _selectedDepositToCalculateCost = incommingDeposit;
+    }
+
+    private void ShowConfirmReservationModal()
+    {
+        _showConfirmReservationModal = true;
+    }
+
+    private void CloseConfirmReservationModal()
+    {
+        _showConfirmReservationModal = false;
+    }
+
+    void SetErrorMessage(string message)
+    {
+        _errorMessage = message;
+    }
+
+    void SetSuccessMessage(string message)
+    {
+        _successMessage = message;
+    }
+    
+    bool ReservationHasExtraDiscountByDays()
+    {
+        var durationInDays = (_endDate - _startDate).Days;
+        SetDiscountByDays();
+        return durationInDays >= 7;
+    }
+    
+    void SetDiscountByDays()
+    {
+        var durationInDays = (_endDate - _startDate).Days;
+
+        _discountByDays = durationInDays switch
+        {
+            > 14 => 10,
+            >= 7 => 5,
+            _ => 0
+        };
+    }
+
+
+}

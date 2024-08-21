@@ -1,0 +1,99 @@
+﻿@page "/view_notifications"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject ClientController ClientController
+
+
+<section class="">
+    <div class="container">
+        <h1 class="text-center mb-4">Notificaciones</h1>
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                @if (_notifications.Count == 0)
+                {
+                    <div class="alert alert-warning" role="alert">
+                        No tienes notificaciones.
+                    </div>
+                }
+                @foreach (var notification in _notifications)
+                {
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            @if (notification.NotificationType == _reservationConfirmed)
+                            {
+                                <h5 class="card-title">Reserva Aceptada</h5>
+                                <p class="card-text">La reserva del deposito "@notification.DepositName" desde @notification.StartDate hasta @notification.EndDate ha sido Aceptada.</p>
+                                <p class="card-text">El pago se encuentra en estado capturado.</p>
+                            }
+                            else if (notification.NotificationType == _reservationRejected)
+                            {
+                                <h5 class="card-title">Reserva Rechazada</h5>
+                                <p class="card-text">La reserva del deposito @notification.DepositName desde @notification.StartDate hasta @notification.EndDate ha sido Rechazada.</p>
+                                <p class="card-text">El pago se le devolvera.</p>
+                            }
+                            <button class="btn btn-success" @onclick="() => DeleteNotification(notification)">
+                                <i class="oi oi-check"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    private List<NotificationsDto> _notifications = new List<NotificationsDto>();
+    private ClientDto _activeUser = new ClientDto();
+    private int _reservationConfirmed = 0;
+    private int _reservationRejected = 1;
+    
+    private void LoadClient()
+    {
+        try
+        {
+            _activeUser = ClientController.GetActiveUserByClientDto();
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    private void LoadNotifications()
+    {
+        try
+        {
+            if (_activeUser != null)
+            {
+                _notifications = ClientController.GetClientNotificationsDtos(_activeUser.Email);
+            }
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        LoadClient();
+        LoadNotifications();
+    }
+
+    private void DeleteNotification(NotificationsDto notification)
+    {
+        try
+        {
+            ClientController.RemoveNotificationDto(notification);
+            LoadNotifications();
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+}

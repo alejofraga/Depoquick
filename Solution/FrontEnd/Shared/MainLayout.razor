@@ -1,0 +1,110 @@
+﻿@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject ClientController ClientController
+
+
+
+<PageTitle>DepoQuick</PageTitle>
+
+<div class="page">
+    @if (IsLogged())
+    {
+        <div class="sidebar">
+            <NavMenu/>
+        </div>
+        <div class="d-flex justify-content-end">
+            <div class="m-2">
+                @if (ActiveUserIsAdmin())
+                {
+                    <span class="text-muted">Admin: </span>
+                    @GetActiveUserName()
+                }
+                else
+                {
+                    <span class="text-muted">Usuario: </span>
+                    @GetActiveUserName()
+                }
+
+            </div>
+            <div>
+                <button class="btn btn-primary" name="submit" type="button" @onclick="Logout">Cerrar sesión</button>
+            </div>
+        </div>
+    }
+
+    <main>
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code
+{
+    
+
+    protected override void OnAfterRender(bool firstRender) => IsLogged();
+    
+    bool IsLogged()
+    {
+        try
+        {
+            return ClientController.GetActiveUserByClientDto() != null;
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+            return false;
+        }
+    }
+
+    void Logout()
+    {
+        try
+        {
+            const string action = "Cierre de sesión";
+            var now = DateTime.Now;
+            ClientController.AddActionToClient(ClientController.GetActiveUserByClientDto().Email, action, now);
+            ClientController.LogOut();
+            NavigationManager.NavigateTo("/login");
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+
+    private string? GetActiveUserName()
+    {
+        try
+        {
+            if (ClientController.GetActiveUserByClientDto() == null)
+            {
+                return "No hay usuario activo";
+            }
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        return ClientController.GetActiveUserByClientDto().Name;
+    }
+
+    private bool ActiveUserIsAdmin()
+    {
+
+        try
+        {
+            return ClientController.GetAdminByClientDto().Email.Equals(ClientController.GetActiveUserByClientDto().Email);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+            return false;
+        }
+    }
+
+}

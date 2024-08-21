@@ -1,0 +1,130 @@
+@page "/client-registration"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inject NavigationManager NavigationManager
+@inherits Navigation
+@inject ClientController ClientController
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<header class="text-center mt-2">
+    <h1>Registro de cliente</h1>
+</header>
+
+<section class="mt-5 d-flex justify-content-center align-items-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="mb-0">
+                            <span>Registro de Usuario</span>
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <form class="needs-validation" novalidate>
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Nombre</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fa fa-user-circle-o"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="name" @bind="_name" placeholder="Ingresa tu nombre" required maxlength="100">
+                                    <div class="invalid-feedback">Por favor ingresa tu nombre completo.</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Correo Electrónico</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fa fa-envelope"></i>
+                                    </span>
+                                    <input type="email" class="form-control" id="email" @bind="_email" placeholder="Ingresa tu correo electrónico" required>
+                                    <div class="invalid-feedback">Por favor ingresa un correo electrónico válido.</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Contraseña</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fa fa-lock"></i>
+                                    </span>
+                                    <input type="password" class="form-control" id="password" @bind="_password1" placeholder="Ingresa tu contraseña" required>
+                                    <div class="invalid-feedback">Por favor ingresa una contraseña válida.</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="confirmPassword" class="form-label">Confirmar Contraseña</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fa fa-lock"></i>
+                                    </span>
+                                    <input type="password" class="form-control" id="confirmPassword" @bind="_password2" placeholder="Confirma tu contraseña" required>
+                                    <div class="invalid-feedback">Por favor confirma tu contraseña.</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" name="submit" type="button" @onclick="RegisterClient">Registrarse</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger mt-3 text-center" role="alert">@_errorMessage</div>
+        }
+        @if (!string.IsNullOrEmpty(_successMessage))
+        {
+            <div class="alert alert-success mt-3 text-center" role="alert">@_successMessage</div>
+        }
+    </div>
+
+</section>
+
+@code
+{
+
+    string? _name;
+    string? _email;
+    string? _password1;
+    string? _password2;
+    string? _errorMessage;
+    string? _successMessage;
+
+
+    private void RegisterClient()
+    {
+        try
+        {
+            ClientController.RegisterClient(_name, _email, _password1, _password2);
+            const string successRegistrationMessage = "Cliente registrado con éxito.";
+            SetSuccessMessage(successRegistrationMessage);
+            SetErrorMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (NullReferenceException)
+        {
+            const string nullReferenceMessage = "Por favor, completa todos los campos";
+            SetErrorMessage(nullReferenceMessage);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+    void SetErrorMessage(string message)
+    {
+        _errorMessage = message;
+    }
+    
+    void SetSuccessMessage(string message)
+    {
+        _successMessage = message;
+    }
+}

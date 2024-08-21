@@ -1,0 +1,42 @@
+﻿@page "/reservation_report"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject ReservationController ReservationController
+
+<div class="container mt-2">
+    <h1 class="text-center mb-4">Exportar Reservas</h1>
+    <p class="text-center">Para exportar la información, presione el botón seleccionando el formato que desea. 
+        Se le proporcionará un archivo en la carpeta de descargas con la información completa de las reservas.</p>
+    <div class="d-flex justify-content-center mt-5">
+        <button @onclick="() => Export (csv)" class="btn btn-primary me-5">Exportar CSV</button>
+        <button @onclick="() => Export (txt)" class="btn btn-primary">Exportar TXT</button>
+    </div>
+</div>
+
+<div id="notificationPopup" class="mt-4 text-center notification-popup alert alert-success alert-dismissible fade show" style="display: @(showPopup ? "block" : "none")" role="alert">
+    Descarga exitosa
+</div>
+@code {
+    
+    private string csv = "csv";
+    private string txt = "txt";
+    private bool showPopup;
+    
+    private async Task Export(string format)
+    {
+        try
+        {
+            ReservationController.ExportReservation(format);
+            showPopup = true;
+            await Task.Delay(3000);
+            showPopup = false;
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+    
+}

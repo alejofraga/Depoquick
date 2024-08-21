@@ -1,0 +1,186 @@
+@page "/deposit-review"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject ClientController ClientController
+@inject DepositController DepositController
+
+<header class="text-center mt-2">
+    <h1>Listado de Reservas</h1>
+</header>
+
+
+<section class="mt-4">
+    <div class="mt-3 d-flex justify-content-center">
+        @if (ReservationListIsEmpty())
+        {
+            <p>No hay reservas disponibles para valorar</p>
+        }
+        else
+        {
+            @foreach (var reservation in _reservations)
+            {
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Reserva: @reservation.ReservationId</h5>
+                        <p class="card-text">Deposito: @reservation.DepositName</p>
+                        <p class="card-text">Fecha Inicial: @reservation.StartDate</p>
+                        <p class="card-text">Fecha Final: @reservation.EndDate</p>
+                        <p class="card-text">Costo: @reservation.Cost</p>
+                        <button @onclick="() => ShowModal(reservation.DepositId, reservation)" class="btn btn-primary">Agregar Valoración</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</section>
+
+
+@if (_showModal)
+{
+    <div class="modal" tabindex="-1" role="dialog" style="display:block">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Agregar Valoración</h5>
+                    <button type="button" class="close" @onclick="HideModal">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="stars" class="form-label">Estrellas</label>
+                        <input type="range" id="stars" min="1" max="5" @bind="_rating" class="form-control-range">
+                        <p>Valoración: @_rating</p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comment" class="form-label">Comentario</label>
+                        <textarea id="comment" @bind="_commentText" class="form-control" placeholder="Máximo 500 caracteres" maxlength="500" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" @onclick="() => AddRating(_selectedDepositId, _selectedReservation)">Guardar Valoración</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger mt-3 text-center" role="alert">@_errorMessage</div>
+}
+@if (!string.IsNullOrEmpty(_successMessage))
+{
+    <div class="alert alert-success" role="alert">
+        @_successMessage
+    </div>
+}
+
+
+@code {
+    private bool _showModal;
+    private int _rating = 5;
+    private string _commentText = string.Empty;
+    private int _selectedDepositId;
+    private List<ReviewReservationDto>? _reservations;
+    private ReviewReservationDto? _selectedReservation;
+    string _errorMessage = string.Empty;
+    string _successMessage = string.Empty;
+
+    private void LoadReservations()
+    {
+        try
+        {
+            _reservations = new List<ReviewReservationDto>();
+            var activeUser = ClientController.GetActiveUserByClientDto();
+            if (activeUser != null)
+            {
+                foreach (var reservation in ClientController.GetClientExpiredAndNotReviewedReservationInDepositReviewDtosByClientDto((activeUser)))
+                {
+                    _reservations.Add(reservation);
+                }
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        LoadReservations();
+    }
+
+    private void ShowModal(int depositId, ReviewReservationDto reviewReservation)
+    {
+        _selectedDepositId = depositId;
+        _selectedReservation = reviewReservation;
+        _showModal = true;
+    }
+
+    private void HideModal()
+    {
+        _showModal = false;
+        _rating = 5;
+        _commentText = string.Empty;
+    }
+
+    private void AddRating(int depositId, ReviewReservationDto reviewReservation)
+    {
+        try
+        {
+            DepositController.AddReviewToDeposit( depositId, _rating, _commentText, reviewReservation);
+            const string action = "Agregó una nueva reseña";
+            var activeUser = ClientController.GetActiveUserByClientDto();
+            var now = DateTime.Now;
+            ClientController.AddActionToClient(activeUser.Email, action, now);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (NullReferenceException)
+        {
+            const string nullReferenceMessage = "Por favor, complete todos los campos";
+            SetErrorMessage(nullReferenceMessage);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        finally
+        {
+            LoadReservations();
+        }
+
+        _showModal = false;
+    }
+
+    void SetErrorMessage(string message)
+    {
+        _errorMessage = message;
+    }
+
+    void SetSuccessMessage(string message)
+    {
+        _successMessage = message;
+    }
+
+    bool ReservationListIsEmpty()
+    {
+        return _reservations.Count == 0;
+    }
+
+
+}

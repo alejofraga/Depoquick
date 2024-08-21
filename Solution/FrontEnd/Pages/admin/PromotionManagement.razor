@@ -1,0 +1,305 @@
+﻿@page "/promotion_management"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject PromotionController PromotionController
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<header class="text-center mt-2">
+    <h1>Gestión de Promociones</h1>
+</header>
+
+<section class="mt-4">
+    <h4 class="text-center">Alta de Promociones</h4>
+    <div class="mt-3 d-flex justify-content-center">
+        <form>
+            <div class="mb-3 row">
+                <label for="tag" class="col-sm-4 col-form-label">Etiqueta</label>
+                <div class="col-sm-8">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fa fa-tag"></i>
+                        </span>
+                        <input id="tag" @bind="_tag" placeholder="Ej: Black Friday" type="text" class="form-control" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 row">
+                <label for="percentage" class="col-sm-4 col-form-label">Porcentaje de descuento</label>
+                <div class="col-sm-8">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fa fa-percent"></i>
+                        </span>
+                        <input id="percentage" @bind="_discountPercentage" type="number" min="1" max="75" placeholder="Ej: 20" required class="form-control">
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="mb-3 row">
+                <label for="startDate" class="col-sm-4 col-form-label">Fecha de Inicio</label>
+                <div class="col-sm-8">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fa fa-calendar-plus-o"></i>
+                        </span>
+                        <input id="startDate" @bind="_startDate" type="date" required class="form-control">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 row">
+                <label for="endDate" class="col-sm-4 col-form-label">Fecha de Fin</label>
+                <div class="col-sm-8">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fa fa-calendar-minus-o"></i>
+                        </span>
+                        <input id="endDate" @bind="_endDate" type="date" required class="form-control">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 row">
+                <div class="mt-2 d-flex justify-content-center">
+                    <button @onclick="AddPromotion" name="submit" type="button" class="btn text-white" style="background-color: #4E9F3D">Agregar Promoción</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+
+<section>
+    <h4 class="mt-4 text-center">Baja y Modificación de Promociones</h4>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger mt-3 text-center" role="alert">@_errorMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <div class="alert alert-success" role="alert">
+            @_successMessage
+        </div>
+    }
+    @if (PromotionListIsEmpty(_promotions))
+    {
+        <p class="text-center">No hay promociones registradas</p>
+    }
+    @foreach (var promotion in _promotions)
+    {
+        <div class="container mt-3 d-flex justify-content-center">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">ID: <span class="font-weight-normal">@promotion.Id</span></h5>
+                    <p class="card-title">Etiqueta: <span class="font-weight-normal">@promotion.Tag</span></p>
+                    <p class="card-text">Descuento: <span class="font-weight-bold">@promotion.DiscountPercentage%</span></p>
+                    <p class="card-text">Validez: <span class="font-weight-bold">Desde @promotion.StartDate</span> hasta <span class="font-weight-bold">@promotion.EndDate</span></p>
+                    <button class="btn btn-primary" @onclick="() => OpenEditModal(promotion)">Editar</button>
+                    <button @onclick="@(() => RemovePromotion(promotion.Id))" class="btn btn-danger">Eliminar</button>
+                </div>
+            </div>
+            @if (_showModal)
+            {
+                <div class="modal" tabindex="-1" role="dialog" style="display:block; background-color: rgba(0, 0, 0, 0.5);">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Editar Promoción</h5>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label for="editTag">Etiqueta:</label>
+                                    <input type="text" class="form-control" id="editTag" @bind="_updatedTag">
+                                </div>
+                                <div class="form-group">
+                                    <label for="editDiscount">Descuento (%):</label>
+                                    <input type="number" class="form-control" id="editDiscount" @bind="_updatedDiscountPercentage">
+                                </div>
+                                <div class="form-group">
+                                    <label for="editStartDate">Fecha de Inicio:</label>
+                                    <input type="date" class="form-control" id="editStartDate" @bind="_updatedStartDate">
+                                </div>
+                                <div class="form-group">
+                                    <label for="editEndDate">Fecha de Fin:</label>
+                                    <input type="date" class="form-control" id="editEndDate" @bind="_updatedEndDate">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">Cerrar</button>
+                                <button type="button" class="btn btn-primary" @onclick="SaveUpdatedPromotion">Guardar Cambios</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+        </div>
+    }
+
+</section>
+
+
+@code {
+    string? _tag = "Promo 1";
+    int _discountPercentage = 5;
+    DateTime _startDate = DateTime.Today;
+    DateTime _endDate = DateTime.Today.AddDays(7);
+    string _successMessage = string.Empty;
+    string _errorMessage = string.Empty;
+    const string NullReferenceMessage = "La promoción a editar no se encontró";
+
+
+    int _updatedDiscountPercentage;
+    int _id;
+    DateTime _updatedStartDate;
+    DateTime _updatedEndDate;
+    string? _updatedTag;
+
+    List<PromotionManagementDto> _promotions = new List<PromotionManagementDto>();
+    bool _showModal;
+
+    void OpenEditModal(PromotionManagementDto promotion)
+    {
+        _updatedDiscountPercentage = promotion.DiscountPercentage;
+        _updatedStartDate = promotion.StartDate;
+        _id = promotion.Id;
+        _updatedEndDate = promotion.EndDate;
+        _updatedTag = promotion.Tag;
+        _showModal = true;
+    }
+
+    void CloseEditModal()
+    {
+        _showModal = false;
+    }
+
+    private void SaveUpdatedPromotion()
+    {
+        try
+        {
+            PromotionController.UpdatePromotion(_updatedTag, _updatedDiscountPercentage, _updatedStartDate, _updatedEndDate, _id);
+            const string sucessUpdatePromotionMessage = "Promoción actualizada con éxito";
+            SetSuccessMessage(sucessUpdatePromotionMessage);
+            SetErrorMessage(string.Empty);
+        }
+        catch (NullReferenceException)
+        {
+            SetErrorMessage(NullReferenceMessage);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        finally
+        {
+            LoadPromotions();
+            CloseEditModal();
+        }
+    }
+
+
+    private void LoadPromotions()
+    {
+        try
+        {
+            _promotions = PromotionController.GetPromotionInPromotionManagementDtos();
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    private void AddPromotion()
+    {
+        try
+        {
+            PromotionController.AddPromotion(_tag, _discountPercentage, _startDate, _endDate);
+            const string successAddPromotionMessage = "Promoción agregada con éxito";
+            SetSuccessMessage(successAddPromotionMessage);
+            SetErrorMessage(string.Empty);
+        }
+        catch (ArgumentNullException)
+        {
+            const string argumentNullMessage = "Por favor, complete todos los campos";
+            SetErrorMessage(argumentNullMessage);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        finally
+        {
+            LoadPromotions();
+        }
+    }
+
+    private void RemovePromotion(int promotionId)
+    {
+        try
+        {
+            PromotionController.RemovePromotion(promotionId);
+            const string sucessRemovePromotionMessage = "Promoción eliminada con éxito";
+            SetSuccessMessage(sucessRemovePromotionMessage);
+            SetErrorMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (NullReferenceException)
+        {
+            SetErrorMessage(NullReferenceMessage);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        finally
+        {
+            LoadPromotions();
+        }
+    }
+
+
+    protected override void OnInitialized()
+    {
+        LoadPromotions();
+    }
+
+    void SetErrorMessage(string message)
+    {
+        _errorMessage = message;
+    }
+
+    void SetSuccessMessage(string message)
+    {
+        _successMessage = message;
+    }
+    
+    bool PromotionListIsEmpty(List<PromotionManagementDto>? promotions)
+    {
+        return promotions == null || promotions.Count == 0;
+    }
+
+}

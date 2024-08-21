@@ -1,0 +1,263 @@
+@page "/deposit_disponibility"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject DepositController DepositController
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<header class="text-center mt-2">
+    <h1 class="h1">Alta de disponibilidad de depósitos</h1>
+</header>
+
+<section class="mt-4">
+    <div class="mt-3 d-flex justify-content-center">
+        @if (_showConfirmationModal)
+        {
+            <div class="modal" tabindex="-1" style="display:block;" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Confirmación de disponibilidad</h5>
+                        </div>
+                        <div class="modal-body">
+                            <p> Está seguro que desea agregar la disponibilidad al deposito: @_selectedDepositToAddDisponibilityDates.Name </p>
+                            <p> <b> Desde: </b> @_startDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("es-ES")) <b> Hasta: </b> @_endDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("es-ES")) ?</p>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="HideConfirmationModal"> Cancelar </button>
+                            <button type="submit" class="btn btn-primary" @onclick="() => { AddDisponibility(); HideConfirmationModal(); LoadDeposits(); }"> Confirmar </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+
+        <form>
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger mt-3 text-center" role="alert">@_errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(_successMessage))
+            {
+                <div class="alert alert-success" role="alert">
+                    @_successMessage
+                </div>
+            }
+            <br>
+            <div>
+                <p class="h5 border-bottom pb-2">Ingrese las fechas para las disponibilidad del depósito:</p>
+            </div>
+
+            <br>
+            <div class="mb-3 row">
+                <label for="startDate" class="col-sm-4 col-form-label">Fecha de Inicio</label>
+                <div class="col-sm-8">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fa fa-calendar-plus-o"> </i>
+                        </span>
+                        <input id="startDate" value="@_startDate.ToString("yyyy-MM-dd")" @oninput="OnStartDateChange" name="startDate" type="date" required class="form-control">
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="mb-3 row">
+                <label for="endDate" class="col-sm-4 col-form-label">Fecha de Fin</label>
+                <div class="col-sm-8">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fa fa-calendar-minus-o"> </i>
+                        </span>
+                        <input id="endDate" value="@_endDate.ToString("yyyy-MM-dd")" @oninput="OnEndDateChange" name="endDate" type="date" required class="form-control">
+                    </div>
+                </div>
+            </div>
+
+
+            <br>
+            <br>
+            <div>
+                <p class="h5 border-bottom pb-2"> Depositos disponibles:</p>
+            </div>
+            <br>
+
+            <div class="mb-3 row">
+
+                @if (!_deposits.Any())
+                {
+                    <p> No existen depósitos registrados </p>
+                }
+                else
+                {
+                    @foreach (var deposit in _deposits)
+                    {
+                        <div class="card">
+                            <div class="card-body">
+                                <h4 class="card-title">
+                                    <b>Depósito:</b> <span class="font-weight-normal">@deposit.Name</span>
+                                </h4>
+                                <p class="card-text">
+                                    <b>Área: </b> <span class="font-weight-normal">@deposit.Area</span>
+                                </p>
+                                <p class="card-text">
+                                    <b>Tamaño:</b> <span class="font-weight-bold">@deposit.Size</span>
+                                </p>
+                                <p class="card-text">
+                                    <b>Climatización:</b> <span class="font-weight-bold"> @(deposit.Conditioning ? "Si" : "No") </span>
+                                </p>
+                                <p class="card-text">
+                                    <b>Promociones aplicadas:</b>
+                                </p>
+                                @if (!@deposit.HasPromotions)
+                                {
+                                    <hr>
+                                    <p> No se aplicaron promociones </p>
+                                    <hr>
+                                }
+                                else
+                                {
+                                    <hr>
+                                    @foreach (var promotion in @deposit.PromotionDtoList)
+                                    {
+                                        <p> @promotion.Tag : @promotion.DiscountPercentage % off</p>
+                                        <hr>
+                                    }
+                                }
+
+                                <p class="card-text">
+                                    <b>Rangos de disponibilidad:</b>
+                                </p>
+
+                                @if (!@deposit.AreDisponibilityRangesRegistered)
+                                {
+                                    <hr>
+                                    <p> Aún no se aplicaron rangos de disponibilidad </p>
+                                    <hr>
+                                }
+                                else
+                                {
+                                    <hr>
+                                    @foreach (var dateRange in @deposit.DateRangesList)
+                                    {
+                                        <p> <b> Desde: </b> @dateRange.StartDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("es-ES")) , <b> Hasta: </b> @dateRange.EndDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("es-ES")) </p>
+                                        <hr>
+                                    }
+                                }
+
+                                <button type="button" class="btn btn-primary" @onclick="() => { SetDepositAddDisponibility(deposit); LoadDeposits(); ShowConfirmationModal(); }"> Agregar Disponibilidad </button>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </form>
+    </div>
+</section>
+
+
+@code {
+    private List<DepositDisponibilityDto> _deposits = new List<DepositDisponibilityDto>();
+    private DepositDisponibilityDto _selectedDepositToAddDisponibilityDates = new DepositDisponibilityDto();
+    DateTime _startDate = DateTime.Today;
+    DateTime _endDate = DateTime.Today.AddDays(7);
+
+    private bool _showConfirmationModal;
+    string _errorMessage = string.Empty;
+    string _successMessage = string.Empty;
+
+
+    protected override void OnInitialized()
+    {
+        LoadDeposits();
+        ClearMessages();
+    }
+
+    private void LoadDeposits()
+    {
+        try
+        {
+            _deposits = DepositController.GetDepositsInDepositDisponibilityDto();
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    private void ClearMessages()
+    {
+        SetSuccessMessage(string.Empty);
+        SetErrorMessage(string.Empty);
+    }
+
+    private void OnStartDateChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value.ToString(), out DateTime result))
+        {
+            _startDate = result;
+        }
+
+        ClearMessages();
+    }
+
+    private void OnEndDateChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value.ToString(), out DateTime result))
+        {
+            _endDate = result;
+        }
+
+        ClearMessages();
+    }
+
+    private void AddDisponibility()
+    {
+        try
+        {
+            DepositController.AddDateRangeDisponibilityToDepositWithDisponibilityDepositDto(_startDate, _endDate, _selectedDepositToAddDisponibilityDates);
+            const string successCreateReservationMessage = "Rango de disponibilida agregado con éxito!";
+            SetSuccessMessage(successCreateReservationMessage);
+            SetErrorMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    void SetErrorMessage(string message)
+    {
+        _errorMessage = message;
+    }
+
+    void SetSuccessMessage(string message)
+    {
+        _successMessage = message;
+    }
+
+    private void ShowConfirmationModal()
+    {
+        _showConfirmationModal = true;
+    }
+
+    private void HideConfirmationModal()
+    {
+        _showConfirmationModal = false;
+    }
+
+    private void SetDepositAddDisponibility(DepositDisponibilityDto incommingDeposit)
+    {
+        _selectedDepositToAddDisponibilityDates = incommingDeposit;
+    }
+
+}

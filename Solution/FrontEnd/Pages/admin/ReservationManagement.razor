@@ -1,0 +1,179 @@
+﻿@page "/reservation_management"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject ClientController ClientController
+@inject ReservationController ReservationController
+
+<div class="container">
+    <h1 class="mb-4 text-center">Gestión de Reservas</h1>
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger mt-3 text-center" role="alert">@_errorMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <div class="alert alert-success" role="alert">
+            @_successMessage
+        </div>
+    }
+    @if (ReservationListIsEmpty())
+    {
+        <p class="text-center">No hay reservas pendientes</p>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var reservation in _reservations)
+            {
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Deposito: @reservation.DepositName</h5>
+                            <p class="card-text"><strong>Cliente:</strong> @reservation.ClientName | @reservation.ClientMail</p>
+                            <p class="card-text">
+                                <strong>Fecha de Inicio:</strong> @reservation.StartDate.ToString("dd/MM/yyyy")
+                            </p>
+                            <p class="card-text">
+                                <strong>Fecha de Fin:</strong> @reservation.EndDate.ToString("dd/MM/yyyy")
+                            </p>
+                            <p class="card-text"><strong>Estado:</strong> Pendiente</p>
+                            <button class="btn btn-success me-2" @onclick="() => ConfirmReservation(reservation)">Aceptar</button>
+                            <button class="btn btn-danger" @onclick="() => ShowRejectModal(reservation)">Rechazar</button>
+                        </div>
+                    </div>
+                </div>
+
+                @if (_showRejectModal && _selectedReservation == reservation)
+                {
+                    <div class="modal" tabindex="-1" style="display:block;" role="dialog">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Razón de rechazo de la reserva del depósito @_selectedReservation.DepositName</h5>
+                                </div>
+                                <div class="modal-body">
+                                    <textarea class="form-control" @bind="@_rejectionReason"></textarea>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" @onclick="CloseRejectModal">Volver</button>
+                                    <button type="button" class="btn btn-primary" @onclick="() => RejectReservation(_selectedReservation)">Enviar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    List<ReservationManagementDTO> _reservations;
+
+    private void LoadReservations()
+    {
+        try
+        {
+            _reservations = ReservationController.GetReservationManagementDtos();
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        LoadReservations();
+    }
+
+    bool _showRejectModal;
+    ReservationManagementDTO? _selectedReservation;
+    string? _rejectionReason = String.Empty;
+    string _errorMessage = string.Empty;
+    string _successMessage = string.Empty;
+    const int _confirmedNotification = 0;
+    const int _rejectedNotification = 1;
+
+    void ShowRejectModal(ReservationManagementDTO reservation)
+    {
+        _selectedReservation = reservation;
+        _showRejectModal = true;
+    }
+
+    void CloseRejectModal()
+    {
+        _showRejectModal = false;
+        _rejectionReason = string.Empty;
+    }
+
+    void RejectReservation(ReservationManagementDTO reservation)
+    {
+        try
+        {
+            ReservationController.RejectReservationByReservationManagementDto(reservation, _rejectionReason);
+            ClientController.AddNotificationToClient(reservation.ClientMail, 1, reservation.DepositName, reservation.StartDate, reservation.EndDate);
+            const string successRejectReservationMessage = "Reserva rechazada con exito";
+            SetSuccessMessage(successRejectReservationMessage);
+            SetErrorMessage(string.Empty);
+            CloseRejectModal();
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        finally
+        {
+            LoadReservations();
+        }
+    }
+
+    void ConfirmReservation(ReservationManagementDTO reservationManagementDto)
+    {
+        try
+        {
+            ReservationController.ConfirmReservationByReservationManagementDto(reservationManagementDto);
+            ClientController.AddNotificationToClient(reservationManagementDto.ClientMail, _confirmedNotification, reservationManagementDto.DepositName, reservationManagementDto.StartDate, reservationManagementDto.EndDate);
+            const string successConfirmReservationMessage = "Reserva confirmada con exito";
+            SetSuccessMessage(successConfirmReservationMessage);
+            SetErrorMessage(string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            SetErrorMessage(ex.Message);
+            SetSuccessMessage(string.Empty);
+            ClientController.AddNotificationToClient(reservationManagementDto.ClientMail, _rejectedNotification, reservationManagementDto.DepositName, reservationManagementDto.StartDate, reservationManagementDto.EndDate);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        finally
+        {
+            LoadReservations();
+        }
+    }
+
+    bool ReservationListIsEmpty()
+    {
+        return _reservations == null || _reservations.Count == 0;
+    }
+
+    void SetErrorMessage(string message)
+    {
+        _errorMessage = message;
+    }
+
+    void SetSuccessMessage(string message)
+    {
+        _successMessage = message;
+    }
+
+}

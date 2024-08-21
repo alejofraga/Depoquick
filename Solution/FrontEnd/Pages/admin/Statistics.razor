@@ -1,0 +1,133 @@
+﻿@page "/statistics"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject ReservationController ReservationController
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<div class="d-grid justify-content-center">
+    <h1 class="text-center mb-4">Dinero generado por zonas</h1>
+    <div class="mb-3 row">
+        <label for="startDate" class="col-sm-4 col-form-label">Fecha de Inicio</label>
+        <div class="col-sm-8">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fa fa-calendar-plus-o"></i>
+                </span>
+                <input id="startDate" @bind="startDate" name="startDate" type="date" required class="form-control">
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3 row">
+        <label for="endDate" class="col-sm-4 col-form-label">Fecha de Fin</label>
+        <div class="col-sm-8">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fa fa-calendar-minus-o"></i>
+                </span>
+                <input id="endDate" @bind="endDate" name="endDate" type="date" required class="form-control">
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Áreas</th>
+                    <th scope="col">Dinero Generado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var area in areas)
+                {
+                    <tr>
+                        <td>@area</td>
+                        <td>@GetMoneyGeneratedBetweenDatesByDepositArea(area, startDate, endDate)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="mt-5 d-grid justify-content-center">
+    <h1 class="text-center mb-1">Cantidad de reservas por zonas</h1>
+    <div class="w-100">
+        <ApexChart TItem="MyData">
+            <ApexPointSeries TItem="MyData"
+                             Items="Data"
+                             Name="Cantidad de Reservas"
+                             SeriesType="SeriesType.Bar"
+                             XValue="e => e.Category"
+                             YValue="e => e.ReservationAmount"/>
+        </ApexChart>
+    </div>
+</div>
+
+@code {
+    private List<MyData> Data { get; set; } = new List<MyData>();
+    private DateTime startDate = DateTime.Today;
+    private DateTime endDate = DateTime.Today.AddDays(10);
+    private char[] areas = { 'A', 'B', 'C', 'D', 'E' };
+
+
+    float GetMoneyGeneratedBetweenDatesByDepositArea(char area, DateTime startDate, DateTime endDate)
+    {
+        try
+        {
+            return ReservationController.GetMoneyGeneratedBetweenDatesByDepositArea(area, startDate, endDate);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+            return 0;
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+            return 0;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            base.OnInitialized();
+            foreach (var area in areas)
+            {
+                Data.Add(new MyData (area.ToString()) {  ReservationAmount = ReservationController.GetAmountOfConfirmedReservationsByDepositArea(area) });
+            }
+
+            UpdateTableData();
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        catch (Exception)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        
+    }
+
+    public class MyData
+    {
+        public MyData(string category)
+        {
+            Category = category;
+        }
+
+        public string Category { get; set; }
+        public int ReservationAmount { get; set; }
+    }
+
+    private void UpdateTableData()
+    {
+        StateHasChanged();
+    }
+}

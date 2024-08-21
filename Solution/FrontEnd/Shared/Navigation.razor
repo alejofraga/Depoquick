@@ -1,0 +1,39 @@
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inject NavigationManager NavigationManager
+@inject ClientController ClientController
+
+@code {
+    protected override void OnAfterRender(bool firstRender) => CheckUserAuthentication();
+
+    public void CheckUserAuthentication()
+    {
+        try
+        {
+            if (!ClientController.AdminRegistered())
+            {
+                NavigationManager.NavigateTo($"/{Routes.AdminRegistration.ToString().ToLower()}");
+            }
+            else if (ClientController.GetActiveUserByClientDto() == null)
+            {
+                NavigationManager.NavigateTo($"/{Routes.Login.ToString().ToLower()}");
+            }
+            else if (OnErrorPage())
+            {
+                ClientController.LogOut();
+                NavigationManager.NavigateTo($"/{Routes.Login.ToString().ToLower()}");
+            }
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+
+    bool OnErrorPage()
+    {
+        return NavigationManager.Uri.Contains(Routes.Error.ToString().ToLower());
+    }
+
+}

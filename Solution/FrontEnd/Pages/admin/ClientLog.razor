@@ -1,0 +1,115 @@
+﻿@page "/client_log"
+@using Controllers
+@using Microsoft.Data.SqlClient
+@inherits Navigation
+@inject NavigationManager NavigationManager
+@inject ClientController ClientController
+
+<header class="text-center mt-2">
+    <h1>Listado de Clientes</h1>
+</header>
+@if (_clients != null)
+{
+    <section class="mt-4">
+        <div class="mt-3">
+            @foreach (var client in _clients)
+            {
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">@client.Name</h5>
+                        <p class="card-text">Correo Electrónico: @client.Email</p>
+                        <button class="btn btn-primary" @onclick="() => OpenLogModal(client)">Ver log de Acciones</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+
+@if (_selectedClient != null && _showLogModal)
+{
+    <div class="modal" style="display: block;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Log de Acciones - @_selectedClient.Name</h5>
+                    <button type="button" class="close" @onclick="CloseLogModal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <ul>
+                        @if (ClientLogIsEmpty(_selectedClient))
+                        {
+                            <h3>No hay acciones registradas</h3>
+                        }
+                        @foreach (var action in GetClientLogByClientDto(_selectedClient).ActionDescriptions)
+                        {
+                            <li>@action</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<ClientDto>? _clients;
+    ClientDto? _selectedClient;
+    bool _showLogModal;
+    protected override void OnInitialized()
+    {
+        try
+        {
+            _clients = ClientController.GetClientDtos();
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+    }
+
+    LogDto GetClientLogByClientDto(ClientDto _selectedClient)
+    {
+        var log = new LogDto();
+        try
+        {
+            log = ClientController.GetClientLogDtoByClientDto(_selectedClient);
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+        }
+        return log;
+    }
+    
+
+    void OpenLogModal(ClientDto client)
+    {
+        _selectedClient = client;
+        _showLogModal = true;
+    }
+
+    void CloseLogModal()
+    {
+        _selectedClient = null;
+        _showLogModal = false;
+    }
+
+    bool ClientLogIsEmpty(ClientDto client)
+    {
+        try
+        {
+            return ClientController.GetClientLogDtoByClientDto(client).ActionDescriptions.Count == 0;
+        }
+        catch (SqlException)
+        {
+            NavigationManager.NavigateTo($"/{Routes.Error.ToString().ToLower()}");
+            return true;
+        }
+    }
+
+}
+
