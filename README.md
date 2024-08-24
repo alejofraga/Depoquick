@@ -1,1 +1,1 @@
-# 281835_281542_250230
+# Proyecto para la materia Diseño de aplicaciones 1 desarrollado en .NET
